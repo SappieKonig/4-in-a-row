@@ -1,0 +1,10 @@
+[package]
+name = "connect_four"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ggez = "0.9"
+rand = "0.8"
+fastrand = "2.0"
+rayon = "1.8"

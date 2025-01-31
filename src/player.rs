@@ -1,9 +1,8 @@
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum Player {
     Human,
     RandomBot,
     MctsBot,
-    Empty,
 }
 
 impl Player {

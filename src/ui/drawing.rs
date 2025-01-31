@@ -1,8 +1,7 @@
 use ggez::{Context, GameResult};
 use ggez::graphics::{self, Canvas, DrawParam, Text, TextFragment, Drawable, Color};
-use crate::board::Board;
+use crate::games::connect4::board::Board;
 use crate::config::{CELL_SIZE, GRID_COLS, GRID_ROWS};
-use crate::player::Player;
 use crate::ui::button::Button;
 use ggez::mint::Point2;
 
@@ -38,7 +37,7 @@ pub fn draw_board(ctx: &mut Context, canvas: &mut Canvas, board: &Board) -> Game
                 graphics::DrawMode::stroke(2.0),
                 graphics::Rect::new(
                     col as f32 * CELL_SIZE,
-                    row as f32 * CELL_SIZE,
+                    (GRID_ROWS - (row + 1)) as f32 * CELL_SIZE,
                     CELL_SIZE,
                     CELL_SIZE,
                 ),
@@ -47,22 +46,21 @@ pub fn draw_board(ctx: &mut Context, canvas: &mut Canvas, board: &Board) -> Game
             canvas.draw(&rect, DrawParam::default());
 
             // Get both the piece and the player number (1 or 2)
-            if let player_number = board.get_player_number(row, col) {
-                if player_number != 0 {
-                    let color = if player_number == 1 { Color::RED } else { Color::YELLOW };
-                    let circle = graphics::Mesh::new_circle(
-                        ctx,
-                        graphics::DrawMode::fill(),
-                        Point2 {
-                            x: col as f32 * CELL_SIZE + CELL_SIZE / 2.0,
-                            y: row as f32 * CELL_SIZE + CELL_SIZE / 2.0,
-                        },
-                        CELL_SIZE / 2.5,
-                        0.1,
-                        color,
-                    )?;
-                    canvas.draw(&circle, DrawParam::default());
-                }
+            let player_number = board.get_player_number(row, col);
+            if player_number != 0 {
+                let color = if player_number == 1 { Color::RED } else { Color::YELLOW };
+                let circle = graphics::Mesh::new_circle(
+                    ctx,
+                    graphics::DrawMode::fill(),
+                    Point2 {
+                        x: col as f32 * CELL_SIZE + CELL_SIZE / 2.0,
+                        y: (GRID_ROWS - (row + 1)) as f32 * CELL_SIZE + CELL_SIZE / 2.0,
+                    },
+                    CELL_SIZE / 2.5,
+                    0.1,
+                    color,
+                )?;
+                canvas.draw(&circle, DrawParam::default());
             }
         }
     }

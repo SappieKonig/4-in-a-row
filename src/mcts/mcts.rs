@@ -1,26 +1,27 @@
 use std::time::{Duration, Instant};
-use std::thread;
 use rayon::prelude::*;
-use crate::bitboard::BitBoard;
+use crate::games::connect4::bitboard::BitBoard;
 use super::node::{Node, RootNode};
 
 pub struct MCTS {
     exploration_constant: f32,
     num_threads: usize,
     time_limit: Duration,
+    n_simulations: u32,
 }
 
 impl MCTS {
-    pub fn new(exploration_constant: f32, num_threads: usize, time_limit_ms: u64) -> Self {
+    pub fn new(exploration_constant: f32, num_threads: usize, time_limit_ms: u64, n_simulations: u32) -> Self {
         Self {
             exploration_constant,
             num_threads,
             time_limit: Duration::from_millis(time_limit_ms),
+            n_simulations,
         }
     }
 
     pub fn search(&self, board: BitBoard, player_number: u8) -> usize {
-        let root = RootNode::new(board);
+        let mut root = RootNode::new(board);
         let start_time = Instant::now();
 
         // Create thread-local search trees and run them in parallel
@@ -40,70 +41,48 @@ impl MCTS {
             root.merge_thread_results(&thread_root);
         }
 
-        // Select best move based on number of visits
-        root.children
-            .iter()
-            .enumerate()
-            .max_by_key(|(_, child)| child.visits)
-            .map(|(i, _)| i)
-            .unwrap_or(0)
+        println!("Root visits: {}", root.get_total_visits());
+
+        root.get_best_move()
     }
 
-    fn run_iteration(&self, node: &mut Node, player_number: u8) {
-        // Phase 1: Selection
-        let mut selected = node;
-        let mut path = vec![selected];
-
-        // Select a path through the tree
-        while selected.is_fully_expanded() && !selected.is_terminal() {
-            selected = selected.children
-                .iter_mut()
-                .max_by(|a, b| {
-                    a.ucb1(node.visits, self.exploration_constant)
-                        .partial_cmp(&b.ucb1(node.visits, self.exploration_constant))
-                        .unwrap()
-                })
-                .unwrap();
-            path.push(selected);
-        }
-
-        // Phase 2: Expansion
-        if !selected.is_terminal() {
-            if let Some(new_node) = selected.expand() {
-                selected = new_node;
-                path.push(selected);
-            }
-        }
-
-        // Phase 3: Simulation (Rollout)
-        let result = self.simulate(selected.board, player_number);
-
-        // Phase 4: Backpropagation
-        for node in path {
-            node.update(result);
-        }
-    }
-
-    fn simulate(&self, mut board: BitBoard, player_number: u8) -> i32 {
-        let mut current_player = player_number;
-        let opponent = if player_number == 1 { 2 } else { 1 };
-
-        while !board.is_full() {
-            let valid_moves = board.get_valid_moves();
-            if valid_moves.is_empty() {
+    fn run_iteration(&self, root: &mut Node, player_number: u8) {
+        let mut current = &mut *root;
+        let mut path_indices = Vec::new();
+        
+        // Selection
+        while !current.is_terminal() && current.is_fully_expanded() {
+            if current.children.is_empty() {
                 break;
             }
-
-            let mov = valid_moves[fastrand::usize(..valid_moves.len())];
-            if board.is_winning_move(mov) {
-                return if current_player == player_number { 1 } else { -1 };
-            }
-
-            board.make_move(mov);
-            current_player = if current_player == 1 { 2 } else { 1 };
+            
+            let child_idx = current.get_best_child_index(self.exploration_constant);
+                
+            path_indices.push(child_idx);
+            current = &mut current.children[child_idx];
         }
-
-        0 // Draw
+    
+        let result = if current.is_terminal() {
+            current.result.unwrap() * self.n_simulations as i32
+        } else if !current.is_fully_expanded() {
+            let new_node = current.expand();
+            if new_node.is_terminal() {
+                new_node.result.unwrap() * self.n_simulations as i32
+            } else {
+                new_node.simulate(player_number, self.n_simulations)
+            }
+        } else {
+            current.simulate(player_number, self.n_simulations)
+        };
+    
+        // Backpropagation
+        let mut current = root;
+        current.update(result, self.n_simulations);
+        
+        for &idx in &path_indices {
+            current = &mut current.children[idx];
+            current.update(result, self.n_simulations);
+        }
     }
 }
 
@@ -112,28 +91,62 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_mcts_basic() {
-        let mcts = MCTS::new(1.414, 4, 1000); // 1 second, 4 threads
-        let board = BitBoard::new();
+    fn test_mcts_finds_winning_moves() {
+        let mcts = MCTS::new(1.414, 4, 1000);
+        
+        // Test horizontal win
+        let mut board = BitBoard::new();
+        board.make_move(0); // Player 1
+        board.make_move(6); // Player 2
+        board.make_move(1); // Player 1
+        board.make_move(6); // Player 2
+        board.make_move(2); // Player 1
+        board.make_move(6); // Player 2
+        
         let best_move = mcts.search(board, 1);
-        assert!(best_move < 7); // Valid column number
+        assert_eq!(best_move, 3, "Failed to find horizontal winning move");
+
+        // Test vertical win
+        let mut board = BitBoard::new();
+        board.make_move(0); // Player 1
+        board.make_move(1); // Player 2
+        board.make_move(0); // Player 1
+        board.make_move(1); // Player 2
+        board.make_move(0); // Player 1
+        board.make_move(1); // Player 2
+        
+        let best_move = mcts.search(board, 1);
+        assert_eq!(best_move, 0, "Failed to find vertical winning move");
+
+        // Test diagonal win
+        let mut board = BitBoard::new();
+        board.make_move(0); // Player 1
+        board.make_move(1); // Player 2
+        board.make_move(1); // Player 1
+        board.make_move(2); // Player 2
+        board.make_move(2); // Player 1
+        board.make_move(3); // Player 2
+        board.make_move(2); // Player 1
+        board.make_move(3); // Player 2
+        board.make_move(3); // Player 1
+        board.make_move(6); // Player 2
+        
+        let best_move = mcts.search(board, 1);
+        assert_eq!(best_move, 3, "Failed to find diagonal winning move");
     }
 
     #[test]
-    fn test_mcts_winning_move() {
+    fn test_mcts_blocks_opponent_win() {
+        let mcts = MCTS::new(1.414, 4, 1000);
         let mut board = BitBoard::new();
-
-        // Set up a winning position
-        board.make_move(0); // Player 1
-        board.make_move(1); // Player 2
-        board.make_move(2); // Player 1
-        board.make_move(1); // Player 2
-        board.make_move(3); // Player 1
-
-        let mcts = MCTS::new(1.414, 4, 500); // 500ms, 4 threads
+        board.make_move(5); // Player 1
+        board.make_move(0); // Player 2
+        board.make_move(6); // Player 1
+        board.make_move(0); // Player 2
+        board.make_move(6); // Player 1
+        board.make_move(0); // Player 2
+        
         let best_move = mcts.search(board, 1);
-
-        // Should find the winning move
-        assert_eq!(best_move, 4);
+        assert_eq!(best_move, 0, "Failed to find blocking move");
     }
 }

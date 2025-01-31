@@ -1,6 +1,6 @@
 use rand::Rng;
-use crate::board::Board;
-use crate::bitboard::BitBoard;
+use crate::games::connect4::board::Board;
+use crate::games::connect4::bitboard::BitBoard;
 use crate::mcts::mcts::MCTS;
 
 pub trait Bot {
@@ -33,7 +33,7 @@ pub struct MctsBot {
 impl MctsBot {
     pub fn new(simulation_time_ms: u64) -> Self {
         Self {
-            mcts: MCTS::new(1.414, 4, simulation_time_ms), // Example parameters
+            mcts: MCTS::new(1.414, 4, simulation_time_ms, 10), // Example parameters
         }
     }
 }

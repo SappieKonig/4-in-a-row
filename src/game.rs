@@ -4,7 +4,7 @@ use ggez::graphics::{Canvas, Color, Text, TextFragment, Drawable, DrawParam};
 use ggez::input::mouse::MouseButton;
 use ggez::mint::Point2;
 
-use crate::board::Board;
+use crate::games::connect4::board::Board;
 use crate::player::Player;
 use crate::ui::{button::Button, screen::GameScreen, drawing, dropdown::Dropdown};
 use crate::config::{SCREEN_WIDTH, SCREEN_HEIGHT, BUTTON_WIDTH, BUTTON_HEIGHT, CELL_SIZE};
@@ -96,8 +96,7 @@ impl GameState {
     }
 
     fn handle_player_move(&mut self, col: usize) {
-        let current_player = self.player_types[(self.current_player_number - 1) as usize];
-        if let Some((row, col)) = self.board.make_move(col, current_player, self.current_player_number) {
+        if let Some((row, col)) = self.board.make_move(col, self.current_player_number) {
             if self.board.check_win(row, col) {
                 self.game_over = true;
                 self.winner = Some(self.current_player_number);
@@ -206,7 +205,6 @@ impl EventHandler for GameState {
                         Player::Human => "Human",
                         Player::RandomBot => "Random Bot",
                         Player::MctsBot => "MCTS Bot",
-                        Player::Empty => "",
                     }
                 );
                 let text = Text::new(TextFragment::new(player_text).color(Color::BLACK));

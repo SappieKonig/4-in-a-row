@@ -1,9 +1,8 @@
 use crate::config::{GRID_COLS, GRID_ROWS};
-use crate::player::Player;
 
 #[derive(Clone)]
 pub struct Board {
-    pub player_numbers: [[u8; GRID_COLS]; GRID_ROWS],
+    pub cells: [[u8; GRID_COLS]; GRID_ROWS],
 }
 
 impl Board {
@@ -18,7 +17,7 @@ impl Board {
     }
 
     pub fn can_play_column(&self, col: usize) -> bool {
-        col < GRID_COLS && self.cells[0][col] == 0
+        col < GRID_COLS && self.cells[GRID_ROWS - 1][col] == 0
     }
 
     pub fn make_move(&mut self, col: usize, player_number: u8) -> Option<(usize, usize)> {
@@ -27,7 +26,7 @@ impl Board {
         }
 
         // Find the lowest empty position in the column
-        for row in (0..GRID_ROWS).rev() {
+        for row in 0..GRID_ROWS {
             if self.cells[row][col] == 0 {
                 self.cells[row][col] = player_number;
                 return Some((row, col));

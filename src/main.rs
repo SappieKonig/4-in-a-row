@@ -1,11 +1,10 @@
 mod game;
-mod board;
-mod bitboard;
 mod player;
 mod ui;
 mod config;
 mod bot;
 mod mcts;
+mod games;
 
 use ggez::{ContextBuilder, GameResult};
 use game::GameState;
